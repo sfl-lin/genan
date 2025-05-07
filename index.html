@@ -8,7 +8,7 @@
         body {
             margin: 0;
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background-color: #0a0a1f; /* 深藍紫色背景，模擬體內環境 */
+            background-color: #0a0a1f; 
             color: #e0e0ff;
             display: flex;
             justify-content: center;
@@ -31,7 +31,7 @@
             display: block;
             width: 100%;
             height: 100%;
-            cursor: crosshair; /* 或者 none，如果希望滑鼠指針完全被細胞替代 */
+            cursor: crosshair; 
         }
 
         #ui-container {
@@ -85,7 +85,7 @@
             font-size: 16px;
             color: #fff;
             text-align: center;
-            z-index: 15; /* Ensure it's above canvas but below screens */
+            z-index: 15; 
         }
 
         #controls-info {
@@ -223,8 +223,10 @@
             <p>選擇一項能力進化：</p>
             <button class="evolution-choice" data-choice="attack">提升攻擊力</button>
             <button class="evolution-choice" data-choice="defense">提升防禦力 (HP上限)</button>
-            <button class="evolution-choice" data-choice="speedFactor">提升滑鼠跟隨速度</button> <!-- Changed from speed to speedFactor -->
+            <button class="evolution-choice" data-choice="speedFactor">提升滑鼠跟隨速度</button> 
             <button class="evolution-choice" data-choice="epregen">提升EP恢復</button>
+            <button class="evolution-choice" data-choice="meleeRange">擴大近戰範圍</button>
+            <button class="evolution-choice" data-choice="bulletCount">增加遠程彈量</button>
         </div>
 
     </div>
@@ -237,7 +239,6 @@
         canvas.width = 800;
         canvas.height = 600;
 
-        // --- UI Elements ---
         const hpBar = document.getElementById('hp-bar');
         const hpValue = document.getElementById('hp-value');
         const epBar = document.getElementById('ep-bar');
@@ -255,17 +256,15 @@
         const restartButton = document.getElementById('restart-button');
         const evolutionButtons = document.querySelectorAll('.evolution-choice');
 
-
         let gameRunning = false;
         let animationFrameId;
 
-        // --- Game State ---
         let player;
         let enemies = [];
         let projectiles = [];
         let collectibles = [];
         let keys = {};
-        let mouse = { x: canvas.width / 2, y: canvas.height / 2, leftDown: false, rightDown: false }; // Initialize mouse position
+        let mouse = { x: canvas.width / 2, y: canvas.height / 2, leftDown: false, rightDown: false }; 
 
         let score = 0; 
         let nextLevelXP = 100;
@@ -273,11 +272,10 @@
 
         const GROUND_LEVEL = canvas.height - 50; 
 
-        // --- Player Object ---
         function createPlayer() {
             return {
                 x: canvas.width / 2 - 15,
-                y: GROUND_LEVEL - 30, // Initial position above ground
+                y: GROUND_LEVEL - 30, 
                 width: 30,
                 height: 30,
                 color: '#80a0ff', 
@@ -288,8 +286,7 @@
                 maxEp: 80,
                 ammo: 20,
                 maxAmmo: 50,
-                // speed: 4, // Original speed, now for boost reference
-                followSpeedFactor: 0.15, // How quickly player follows mouse (0 to 1)
+                followSpeedFactor: 0.15, 
                 xp: 0,
                 level: 1,
                 baseAttack: 10,
@@ -305,6 +302,10 @@
 
                 hitTimer: 0, 
 
+                // New properties for attack enhancements
+                baseMeleeRangeBonus: 0, // Additional range for melee
+                numShotgunPellets: 3,   // Number of bullets per remote shot
+
                 draw() {
                     ctx.fillStyle = this.color;
                     if (this.hitTimer > 0) {
@@ -318,7 +319,7 @@
                     let currentGlowColor = 'transparent';
 
                     if (this.immuneBoostActive) {
-                        currentGlowRadius += 5 + Math.sin(Date.now()/100)*2; // Pulsing glow
+                        currentGlowRadius += 5 + Math.sin(Date.now()/100)*2; 
                         currentGlowColor = 'rgba(255, 255, 100, 0.6)';
                     } else if (this.attackBoostTimer > 0) {
                         currentGlowRadius += 3 + Math.sin(Date.now()/150)*1.5;
@@ -331,7 +332,6 @@
                         ctx.fillStyle = currentGlowColor;
                         ctx.fill();
                     }
-
 
                     ctx.fillStyle = 'white';
                     ctx.beginPath();
@@ -349,26 +349,21 @@
                     ctx.fill();
                 },
                 update() {
-                    // --- Mouse Follow Movement ---
                     let targetX = mouse.x - this.width / 2;
                     let targetY = mouse.y - this.height / 2;
 
-                    // Smooth movement
                     let actualFollowSpeed = this.followSpeedFactor;
-                    if(this.immuneBoostActive) actualFollowSpeed *= 1.5; // Boosted follow speed
+                    if(this.immuneBoostActive) actualFollowSpeed *= 1.5; 
 
-                    this.x += (targetX - this.x) * actualFollowSpeed;
+                    this.x += (targetX - this.x) * actualFollowSpeed; 
                     this.y += (targetY - this.y) * actualFollowSpeed;
 
-                    // Screen boundaries
                     if (this.x < 0) this.x = 0;
                     if (this.x + this.width > canvas.width) this.x = canvas.width - this.width;
-                    if (this.y < 0) this.y = 0;
-                    if (this.y + this.height > GROUND_LEVEL) {
+                    if (this.y < 0) this.y = 0; 
+                    if (this.y + this.height > GROUND_LEVEL) { 
                         this.y = GROUND_LEVEL - this.height;
                     }
-                    // --- End Mouse Follow Movement ---
-
 
                     if (this.ep < this.maxEp) {
                         this.ep += 0.05; 
@@ -379,7 +374,6 @@
                         this.immuneBoostTimer -= 1000 / 60; 
                         if (this.immuneBoostTimer <= 0) {
                             this.immuneBoostActive = false;
-                            // this.speed /= 1.5; // No longer direct speed, follow factor handles this
                             this.attack /= 1.5;
                             this.lastImmuneBoostTime = Date.now();
                             messageArea.textContent = "免疫爆發結束";
@@ -390,8 +384,8 @@
                     if (this.attackBoostTimer > 0) {
                         this.attackBoostTimer -= 1000 / 60;
                         if (this.attackBoostTimer <= 0) {
-                            this.attack = this.baseAttack * (this.immuneBoostActive ? 1.5 : 1); // Ensure boost stacks correctly
-                             messageArea.textContent = "攻擊強化結束";
+                            this.attack = this.baseAttack * (this.immuneBoostActive ? 1.5 : 1); 
+                            messageArea.textContent = "攻擊強化結束";
                             setTimeout(() => { if(messageArea.textContent === "攻擊強化結束") messageArea.textContent = "";}, 1500);
                         }
                     }
@@ -401,37 +395,52 @@
                     }
                 },
                 shoot(isRemote) {
-                    if (isRemote) {
+                    if (isRemote) { // --- SHOTGUN LOGIC ---
+                        const numProjectilesToFire = this.numShotgunPellets;
+                        const spreadAngle = Math.PI / 12; // Total spread of 15 degrees for 3 pellets, adjust as needed
+
+                        // Cost: 1 ammo, 5 EP for the whole volley (easier to play)
                         if (this.ammo > 0 && this.ep >= 5) {
                             this.ammo--;
                             this.ep -= 5;
-                            projectiles.push({
-                                x: this.x + this.width / 2 - 2.5,
-                                y: this.y + this.height / 2 - 2.5,
-                                width: 8, height: 8,
-                                color: '#60c0ff',
-                                speed: 10, // Slightly faster projectiles
-                                damage: this.attack * 0.7, 
-                                isPlayer: true,
-                                // Angle calculation is fine, as mouse.x/y is the target direction
-                                angle: Math.atan2(mouse.y - (this.y + this.height / 2), mouse.x - (this.x + this.width / 2))
-                            });
+                            let baseAngle = Math.atan2(mouse.y - (this.y + this.height / 2), mouse.x - (this.x + this.width / 2));
+                            
+                            for (let i = 0; i < numProjectilesToFire; i++) {
+                                let currentAngle;
+                                if (numProjectilesToFire === 1) {
+                                    currentAngle = baseAngle;
+                                } else {
+                                    // Distribute pellets evenly across spreadAngle
+                                    currentAngle = baseAngle - (spreadAngle / 2) + (spreadAngle * i / (numProjectilesToFire - 1));
+                                }
+                                
+                                projectiles.push({
+                                    x: this.x + this.width / 2 - 2.5,
+                                    y: this.y + this.height / 2 - 2.5,
+                                    width: 8, height: 8,
+                                    color: '#60c0ff',
+                                    speed: 10, 
+                                    damage: this.attack * 0.6, // Individual pellet damage slightly reduced
+                                    isPlayer: true,
+                                    angle: currentAngle
+                                });
+                            }
                         }
-                    } else { 
+                    } else { // --- MELEE LOGIC ---
                         if (this.ep >= 2) {
                             this.ep -= 2;
+                            const meleeBaseSize = 60; // Increased base melee attack "radius"
                             projectiles.push({ 
                                 x: this.x + this.width / 2, 
                                 y: this.y + this.height / 2,
-                                width: this.width + 30, // Melee range
-                                height: this.height + 30,
+                                width: meleeBaseSize + this.baseMeleeRangeBonus + this.width, // Use player width as part of radius
+                                height: meleeBaseSize + this.baseMeleeRangeBonus + this.height,
                                 color: 'rgba(200, 220, 255, 0.4)',
-                                lifespan: 6, // slightly longer for visual
-                                damage: this.attack,
+                                lifespan: 7, // Slightly longer for better visual feedback
+                                damage: this.attack * 1.1, // Melee slightly stronger base
                                 isPlayer: true,
                                 isMelee: true,
                                 owner: this,
-                                // Melee attack direction still uses mouse for aiming the "cone"
                                 angle: Math.atan2(mouse.y - (this.y + this.height / 2), mouse.x - (this.x + this.width / 2))
                             });
                         }
@@ -442,7 +451,6 @@
                         this.ep -= 30;
                         this.immuneBoostActive = true;
                         this.immuneBoostTimer = this.immuneBoostDuration;
-                        // this.speed *= 1.5; // Replaced by followSpeedFactor modification during boost
                         this.attack *= 1.5;
                         messageArea.textContent = "免疫爆發！";
                         setTimeout(() => { if(messageArea.textContent === "免疫爆發！") messageArea.textContent = "";}, 2000);
@@ -480,11 +488,10 @@
             };
         }
 
-        // --- Enemy Object ---
         function createEnemy(type = 'bacteria') {
             let enemy = {
                 x: Math.random() < 0.5 ? -30 : canvas.width + 30, 
-                y: GROUND_LEVEL - 20 - Math.random() * (GROUND_LEVEL * 0.6), // Spawn enemies higher up too
+                y: GROUND_LEVEL - 20 - Math.random() * (GROUND_LEVEL * 0.7), // Can spawn higher
                 width: 20,
                 height: 20,
                 speed: 1 + Math.random() * 1,
@@ -518,34 +525,32 @@
                     }
                 },
                 update() {
-                    // Basic AI: move towards player (if player exists)
                     if(player) {
                         let dx = (player.x + player.width / 2) - (this.x + this.width / 2);
                         let dy = (player.y + player.height / 2) - (this.y + this.height / 2);
                         let dist = Math.sqrt(dx*dx + dy*dy);
                         
-                        if (dist > 0) { // Avoid division by zero
+                        if (dist > 0) { 
                             this.x += (dx / dist) * this.speed;
                             this.y += (dy / dist) * this.speed;
                         }
 
-                        // Prevent overlapping too much
                         if (dist < this.width / 2 + player.width / 2) {
                             this.x -= (dx / dist) * this.speed * 0.5;
                             this.y -= (dy / dist) * this.speed * 0.5;
                         }
                     }
-                     // Keep enemies above ground
                     if (this.y + this.height > GROUND_LEVEL) {
                         this.y = GROUND_LEVEL - this.height;
                     }
+                     if (this.y < 0) this.y = 0; // Prevent enemies from going too high
                 },
                 takeDamage(amount) {
                     this.hp -= amount;
                     if (this.hp <= 0) {
                         if(player) player.gainXP(this.xpValue);
                         score += this.xpValue; 
-                        if (Math.random() < 0.35) { // Slightly higher drop chance
+                        if (Math.random() < 0.4) { // Increased drop chance
                             let type;
                             const rand = Math.random();
                             if (rand < 0.5) type = 'nutrient';
@@ -562,21 +567,19 @@
                 enemy.color = '#a060ff'; 
                 enemy.width = 15;
                 enemy.height = 15;
-                enemy.speed = 2 + Math.random() * 1.5; // Viruses are faster
-                enemy.hp = 20;
-                enemy.maxHp = 20;
-                enemy.damage = 15;
+                enemy.speed = 2.2 + Math.random() * 1.5; // Viruses slightly faster
+                enemy.hp = 25; // Viruses slightly tankier
+                enemy.maxHp = 25;
+                enemy.damage = 12;
                 enemy.xpValue = 15;
             }
             return enemy;
         }
 
-        // --- Projectile Object ---
         function updateProjectiles() {
             for (let i = projectiles.length - 1; i >= 0; i--) {
                 let p = projectiles[i];
                 if (p.isMelee) {
-                    // Melee attack hitbox position updated with player, but its angle is fixed on creation
                     p.x = p.owner.x + p.owner.width / 2; 
                     p.y = p.owner.y + p.owner.height / 2;
 
@@ -589,7 +592,7 @@
                     p.x += Math.cos(p.angle) * p.speed;
                     p.y += Math.sin(p.angle) * p.speed;
 
-                    if (p.x < -p.width || p.x > canvas.width + p.width || p.y < -p.height || p.y > canvas.height + p.height) { // Give some buffer
+                    if (p.x < -p.width || p.x > canvas.width + p.width || p.y < -p.height || p.y > canvas.height + p.height) { 
                         projectiles.splice(i, 1);
                         continue;
                     }
@@ -601,11 +604,11 @@
             projectiles.forEach(p => {
                 ctx.fillStyle = p.color;
                 if (p.isMelee) {
-                    ctx.globalAlpha = 0.4 + (p.lifespan / 12); // Fade out melee
+                    ctx.globalAlpha = 0.3 + (p.lifespan / 15); 
                     ctx.beginPath();
-                    ctx.moveTo(p.x, p.y); // Center of player
-                    // Arc based on projectile's stored angle (mouse direction at time of attack)
-                    ctx.arc(p.x, p.y, p.width/2, p.angle - Math.PI/5, p.angle + Math.PI/5); 
+                    ctx.moveTo(p.x, p.y); 
+                    // Make fan wider, e.g., PI/4 for a 45-degree total spread on each side (90 total)
+                    ctx.arc(p.x, p.y, p.width/2, p.angle - Math.PI/4, p.angle + Math.PI/4); 
                     ctx.closePath();
                     ctx.fill();
                     ctx.globalAlpha = 1.0;
@@ -617,8 +620,6 @@
             });
         }
 
-
-        // --- Collectible Object ---
         function createCollectible(x, y, type) {
             let collectible = {
                 x: x, y: y,
@@ -627,8 +628,8 @@
                 color: '#FFFFFF', 
                 effectValue: 0,
                 draw() {
-                    ctx.save(); // Save context for potential transformations
-                    ctx.translate(this.x, this.y); // Center drawing operations
+                    ctx.save(); 
+                    ctx.translate(this.x, this.y); 
                     ctx.fillStyle = this.color;
                     if (this.type === 'nutrient') { 
                         ctx.beginPath();
@@ -655,27 +656,27 @@
                         ctx.arc(0, 0, this.width / 2, 0, Math.PI * 2);
                         ctx.fill();
                     }
-                    ctx.restore(); // Restore context
+                    ctx.restore(); 
                 },
                 applyEffect() {
                     let msg = "";
                     if (this.type === 'nutrient') {
-                        player.ep = Math.min(player.maxEp, player.ep + 20);
-                        msg = "+20 EP";
+                        player.ep = Math.min(player.maxEp, player.ep + 25); // More EP
+                        msg = "+25 EP";
                     } else if (this.type === 'antibody') {
-                        player.ammo = Math.min(player.maxAmmo, player.ammo + 10);
-                        msg = "+10 彈藥";
+                        player.ammo = Math.min(player.maxAmmo, player.ammo + 12); // More ammo
+                        msg = "+12 彈藥";
                     } else if (this.type === 'cytokine') {
                         player.attackBoostTimer = player.attackBoostDuration;
-                        player.attack = player.baseAttack * 1.5 * (player.immuneBoostActive ? 1.5 : 1) ; // Stack with immune boost
+                        player.attack = player.baseAttack * 1.5 * (player.immuneBoostActive ? 1.5 : 1) ; 
                         msg = "攻擊強化！";
                     }
                     messageArea.textContent = msg;
                     setTimeout(() => {if(messageArea.textContent === msg) messageArea.textContent = "";}, 1500);
                 }
             };
-            if (type === 'nutrient') { collectible.color = '#40ff40'; collectible.effectValue = 20; } 
-            else if (type === 'antibody') { collectible.color = '#60a0ff'; collectible.effectValue = 10; } 
+            if (type === 'nutrient') { collectible.color = '#40ff40';} 
+            else if (type === 'antibody') { collectible.color = '#60a0ff';} 
             else if (type === 'cytokine') { collectible.color = '#ff6060'; } 
             return collectible;
         }
@@ -684,11 +685,9 @@
             collectibles.forEach(c => c.draw());
         }
 
-        // --- Collision Detection ---
         function checkCollisions() {
-            if (!player) return; // Skip collisions if player doesn't exist
+            if (!player) return; 
 
-            // Player projectiles vs Enemies
             for (let i = projectiles.length - 1; i >= 0; i--) {
                 let p = projectiles[i];
                 if (!p.isPlayer) continue;
@@ -697,17 +696,15 @@
                     let e = enemies[j];
                     let dist;
                     if (p.isMelee) {
-                        // Check if enemy center is within the melee arc
-                        let dx = (e.x + e.width/2) - p.x; // p.x is player center for melee
-                        let dy = (e.y + e.height/2) - p.y; // p.y is player center for melee
+                        let dx = (e.x + e.width/2) - p.x; 
+                        let dy = (e.y + e.height/2) - p.y; 
                         dist = Math.sqrt(dx*dx + dy*dy);
-                        if (dist < p.width/2 + e.width/2) { // Basic range check
+                        if (dist < p.width/2 + e.width/2) { 
                             let angleToEnemy = Math.atan2(dy, dx);
                             let angleDiff = Math.abs(p.angle - angleToEnemy);
-                            // Normalize angle difference
                             if (angleDiff > Math.PI) angleDiff = 2 * Math.PI - angleDiff; 
                             
-                            if (angleDiff <= Math.PI/5) { // Check if enemy is within the +/- PI/5 cone of attack
+                            if (angleDiff <= Math.PI/4) { // Matching wider fan from drawProjectiles
                                 if (e.takeDamage(p.damage)) {
                                     enemies.splice(j, 1); 
                                 }
@@ -726,7 +723,6 @@
                 }
             }
             
-            // Enemies vs Player (rectangle collision for simplicity, could be circle)
             enemies.forEach(e => {
                 let pCenterX = player.x + player.width / 2;
                 let pCenterY = player.y + player.height / 2;
@@ -741,20 +737,18 @@
                 }
             });
 
-            // Player vs Collectibles
             for (let i = collectibles.length - 1; i >= 0; i--) {
                 let c = collectibles[i];
                 let dist = Math.sqrt(Math.pow((player.x + player.width/2) - c.x, 2) + Math.pow((player.y + player.height/2) - c.y, 2));
-                if (dist < player.width/2 + c.width/2) {
+                if (dist < player.width/2 + c.width/2 + 5) { // Slightly larger pickup radius
                     c.applyEffect();
                     collectibles.splice(i, 1);
                 }
             }
         }
 
-        // --- Game Flow & UI ---
         function updateUI() {
-            if(!player) return; // Don't update UI if player doesn't exist
+            if(!player) return; 
             hpBar.style.width = (player.hp / player.maxHp) * 100 + '%';
             hpValue.textContent = `${Math.ceil(player.hp)}/${player.maxHp}`;
             epBar.style.width = (player.ep / player.maxEp) * 100 + '%';
@@ -767,9 +761,9 @@
 
         function spawnEnemies() {
             if(!player) return;
-            if (enemies.length < 3 + player.level * 2) { 
-                if (Math.random() < (0.015 + player.level * 0.0025) ) { 
-                    const enemyType = Math.random() < (0.7 - player.level * 0.05) ? 'bacteria' : 'virus'; // More viruses at higher levels
+            if (enemies.length < 4 + player.level * 2.5) { // Slightly more enemies overall
+                if (Math.random() < (0.018 + player.level * 0.003) ) { 
+                    const enemyType = Math.random() < (0.65 - player.level * 0.06) ? 'bacteria' : 'virus'; 
                     enemies.push(createEnemy(enemyType));
                 }
             }
@@ -790,7 +784,7 @@
 
             for(let i=0; i<10; i++) { 
                 ctx.beginPath();
-                let speedFactor = (30 + i * 8); // Slower background elements
+                let speedFactor = (30 + i * 8); 
                 let xPos = ( (Date.now() / speedFactor) + i*90 + Math.sin(Date.now() / (2200 + i*60)) * 60 ) % (canvas.width + 120) - 60;
                 let yPos = (GROUND_LEVEL - 20) / 9 * i + Math.sin(Date.now()/(900+i*130) + i )*35;
                 let radius = 3 + i * 1.2 + Math.sin(Date.now() / (700 + i*110)) * 1.5;
@@ -799,7 +793,6 @@
                 ctx.fill();
             }
         }
-
 
         function gameLoop() {
             if (!gameRunning) {
@@ -810,22 +803,16 @@
             }
 
             ctx.clearRect(0, 0, canvas.width, canvas.height);
-
             drawEnvironment();
-
-            if(player) { // Only update and draw if player exists
+            if(player) { 
                 player.update();
                 player.draw();
             }
-
             enemies.forEach(e => e.update());
             enemies.forEach(e => e.draw());
-
             updateProjectiles();
             drawProjectiles();
-
             drawCollectibles(); 
-
             checkCollisions();
             spawnEnemies();
             updateUI();
@@ -840,7 +827,6 @@
                     return;
                  }
             }
-            
             animationFrameId = requestAnimationFrame(gameLoop);
         }
         
@@ -848,20 +834,20 @@
             let boss = createEnemy('bacteria'); 
             boss.type = 'boss_bacteria';
             boss.x = canvas.width / 2 - 50;
-            boss.y = GROUND_LEVEL - 120; // Spawn slightly higher
+            boss.y = GROUND_LEVEL - 120; 
             boss.width = 100;
             boss.height = 100;
             boss.color = '#8B0000'; 
-            boss.hp = 300 + (player ? player.level * 150 : 150); 
+            boss.hp = 250 + (player ? player.level * 120 : 120); // Boss HP slightly reduced for easier kill
             boss.maxHp = boss.hp;
-            boss.damage = 30; // Boss hits harder
+            boss.damage = 25; // Boss hits slightly less hard
             boss.xpValue = 500;
-            boss.speed = 0.3; // Boss is slower but tankier
+            boss.speed = 0.35; // Boss slightly faster
             let originalDraw = boss.draw;
             boss.draw = function() { 
                 originalDraw.call(this); 
                 ctx.fillStyle = 'yellow'; 
-                ctx.beginPath(); // Crown points
+                ctx.beginPath(); 
                 ctx.moveTo(this.x + this.width/2 - 15, this.y - 5);
                 ctx.lineTo(this.x + this.width/2 - 5, this.y - 20);
                 ctx.lineTo(this.x + this.width/2 + 5, this.y - 5);
@@ -885,7 +871,6 @@
             return boss;
         }
 
-
         function gameOver(message, isWin = false) {
             gameRunning = false;
             cancelAnimationFrame(animationFrameId);
@@ -903,8 +888,8 @@
             enemies = [];
             projectiles = [];
             collectibles = [];
-            keys = {}; // Keep keys for 'E' skill
-            mouse.leftDown = false; // Reset mouse state
+            keys = {}; 
+            mouse.leftDown = false; 
             mouse.rightDown = false;
             score = 0;
             currentLevelGoal = 1;
@@ -924,7 +909,6 @@
             gameLoop();
         }
 
-        // --- Event Listeners ---
         window.addEventListener('keydown', (e) => {
             keys[e.key.toLowerCase()] = true;
             if (e.key.toLowerCase() === 'e' && gameRunning && player) { 
@@ -958,7 +942,6 @@
         });
         canvas.addEventListener('contextmenu', e => e.preventDefault());
 
-
         startButton.addEventListener('click', () => {
             resetGame();
         });
@@ -983,14 +966,22 @@
                         player.hp = player.maxHp; 
                         evolutionMsg = "HP上限提升！";
                         break;
-                    case 'speedFactor': // Changed from 'speed'
-                        player.followSpeedFactor = Math.min(player.followSpeedFactor + 0.03, 0.5); // Cap follow speed
+                    case 'speedFactor': 
+                        player.followSpeedFactor = Math.min(player.followSpeedFactor + 0.03, 0.5); 
                         evolutionMsg = "滑鼠跟隨速度提升！";
                         break;
                     case 'epregen':
                         player.maxEp += 20;
                         player.ep = player.maxEp;
                         evolutionMsg = "EP上限及恢復提升！";
+                        break;
+                    case 'meleeRange': // New evolution
+                        player.baseMeleeRangeBonus += 25; // Increase bonus range more significantly
+                        evolutionMsg = "近戰範圍擴大！";
+                        break;
+                    case 'bulletCount': // New evolution
+                        player.numShotgunPellets = Math.min(player.numShotgunPellets + (player.numShotgunPellets < 5 ? 2 : 1), 7); // Add 2 pellets if less than 5, else 1, cap at 7
+                        evolutionMsg = "遠程彈量增加！";
                         break;
                 }
                 levelUpScreen.style.display = 'none';
@@ -1003,7 +994,7 @@
 
         function initializeUI() {
             player = createPlayer(); 
-            mouse.x = player.x + player.width / 2; // Initialize mouse to player start
+            mouse.x = player.x + player.width / 2; 
             mouse.y = player.y + player.height / 2;
             updateUI();
             startScreen.style.display = 'flex';
