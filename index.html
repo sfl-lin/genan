@@ -1,0 +1,1016 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>細胞歷險記 — 微觀世界的守護者</title>
+    <style>
+        body {
+            margin: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #0a0a1f; /* 深藍紫色背景，模擬體內環境 */
+            color: #e0e0ff;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            overflow: hidden;
+        }
+
+        #game-container {
+            position: relative;
+            width: 800px;
+            height: 600px;
+            border: 2px solid #6060ff;
+            box-shadow: 0 0 20px #6060ff;
+            background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><radialGradient id="grad" cx="50%" cy="50%" r="50%"><stop offset="0%" style="stop-color:rgba(20,20,50,0.8);stop-opacity:1" /><stop offset="100%" style="stop-color:rgba(10,10,30,0.8);stop-opacity:1" /></radialGradient></defs><circle cx="15" cy="15" r="2" fill="rgba(255,0,0,0.3)"/><circle cx="80" cy="30" r="3" fill="rgba(200,0,0,0.2)"/><circle cx="50" cy="70" r="1.5" fill="rgba(220,0,0,0.25)"/><rect width="100" height="100" fill="url(%23grad)"/></svg>');
+            background-size: cover;
+        }
+
+        #gameCanvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+            cursor: crosshair; /* 或者 none，如果希望滑鼠指針完全被細胞替代 */
+        }
+
+        #ui-container {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            padding: 10px;
+            background-color: rgba(0, 0, 20, 0.7);
+            border-radius: 8px;
+            border: 1px solid #303090;
+            font-size: 14px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            z-index: 10;
+        }
+
+        .status-bar {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .bar-background {
+            width: 100px;
+            height: 12px;
+            background-color: #333;
+            border-radius: 3px;
+            overflow: hidden;
+            border: 1px solid #555;
+        }
+
+        .bar-fill {
+            height: 100%;
+            border-radius: 2px;
+            transition: width 0.2s ease-in-out;
+        }
+
+        #hp-bar { background-color: #ff4040; }
+        #ep-bar { background-color: #40a0ff; }
+        #xp-bar { background-color: #ffd700; }
+
+        #message-area {
+            position: absolute;
+            bottom: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: rgba(0,0,0,0.6);
+            padding: 8px 15px;
+            border-radius: 5px;
+            font-size: 16px;
+            color: #fff;
+            text-align: center;
+            z-index: 15; /* Ensure it's above canvas but below screens */
+        }
+
+        #controls-info {
+            position: absolute;
+            bottom: 10px;
+            right: 10px;
+            font-size: 10px;
+            color: #aaa;
+            text-align: right;
+        }
+
+        .screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(10, 10, 30, 0.95);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            z-index: 20;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+
+        .screen h1 {
+            font-size: 3em;
+            color: #8080ff;
+            text-shadow: 0 0 10px #6060ff;
+            margin-bottom: 20px;
+        }
+        .screen h2 {
+            font-size: 2em;
+            color: #a0a0ff;
+            margin-bottom: 15px;
+        }
+        .screen p {
+            font-size: 1.2em;
+            margin-bottom: 30px;
+            max-width: 80%;
+        }
+        .screen button {
+            padding: 12px 25px;
+            font-size: 1.2em;
+            background-color: #6060ff;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+            margin: 5px;
+        }
+        .screen button:hover {
+            background-color: #8080ff;
+        }
+
+        .instructions {
+            margin-top: 30px;
+            text-align: left;
+            background-color: rgba(20,20,50,0.5);
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid #404080;
+        }
+        .instructions h3 {
+            color: #a0a0ff;
+            margin-top: 0;
+        }
+        .instructions p {
+            font-size: 1em;
+            margin-bottom: 8px;
+        }
+    </style>
+</head>
+<body>
+    <div id="game-container">
+        <canvas id="gameCanvas"></canvas>
+
+        <div id="ui-container">
+            <div class="status-bar">
+                <span>HP:</span>
+                <div class="bar-background" id="hp-bar-bg"><div class="bar-fill" id="hp-bar"></div></div>
+                <span id="hp-value">100/100</span>
+            </div>
+            <div class="status-bar">
+                <span>EP:</span>
+                <div class="bar-background" id="ep-bar-bg"><div class="bar-fill" id="ep-bar"></div></div>
+                <span id="ep-value">80/80</span>
+            </div>
+            <div class="status-bar">
+                <span>彈藥:</span>
+                <span id="ammo-value">20/50</span>
+            </div>
+            <div class="status-bar">
+                <span>XP:</span>
+                <div class="bar-background" id="xp-bar-bg"><div class="bar-fill" id="xp-bar"></div></div>
+                <span id="xp-value-text">0</span> 
+            </div>
+            <div class="status-bar">
+                <span>等級:</span>
+                <span id="level-value">1</span>
+            </div>
+            <div id="message-area">點擊開始遊戲</div>
+            <div id="controls-info">
+                移動: 滑鼠 | 近戰: 滑鼠左鍵 | 遠程: 滑鼠右鍵 | 爆發: E
+            </div>
+        </div>
+
+        <div id="start-screen" class="screen">
+            <h1>細胞歷險記</h1>
+            <p>微觀世界的守護者</p>
+            <button id="start-button">開始遊戲</button>
+            <div class="instructions">
+                <h3>遊戲目標</h3>
+                <p>扮演細胞戰士，消滅病原體，保護宿主健康！</p>
+                <h3>操作說明</h3>
+                <p>移動: 細胞會跟隨滑鼠指針</p>
+                <p>近距離噬菌: 滑鼠左鍵</p>
+                <p>遠距離抗體: 滑鼠右鍵 (消耗彈藥)</p>
+                <p>免疫爆發: E鍵 (消耗EP，有冷卻)</p>
+            </div>
+        </div>
+
+        <div id="game-over-screen" class="screen" style="display: none;">
+            <h1>遊戲結束</h1>
+            <p id="game-over-message"></p>
+            <button id="restart-button">重新開始</button>
+        </div>
+        
+        <div id="level-up-screen" class="screen" style="display: none;">
+            <h2>等級提升！</h2>
+            <p>選擇一項能力進化：</p>
+            <button class="evolution-choice" data-choice="attack">提升攻擊力</button>
+            <button class="evolution-choice" data-choice="defense">提升防禦力 (HP上限)</button>
+            <button class="evolution-choice" data-choice="speedFactor">提升滑鼠跟隨速度</button> <!-- Changed from speed to speedFactor -->
+            <button class="evolution-choice" data-choice="epregen">提升EP恢復</button>
+        </div>
+
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const gameContainer = document.getElementById('game-container');
+
+        canvas.width = 800;
+        canvas.height = 600;
+
+        // --- UI Elements ---
+        const hpBar = document.getElementById('hp-bar');
+        const hpValue = document.getElementById('hp-value');
+        const epBar = document.getElementById('ep-bar');
+        const epValue = document.getElementById('ep-value');
+        const ammoValue = document.getElementById('ammo-value');
+        const xpBar = document.getElementById('xp-bar');
+        const xpValueText = document.getElementById('xp-value-text'); 
+        const levelValueText = document.getElementById('level-value');
+        const messageArea = document.getElementById('message-area');
+
+        const startScreen = document.getElementById('start-screen');
+        const gameOverScreen = document.getElementById('game-over-screen');
+        const levelUpScreen = document.getElementById('level-up-screen');
+        const startButton = document.getElementById('start-button');
+        const restartButton = document.getElementById('restart-button');
+        const evolutionButtons = document.querySelectorAll('.evolution-choice');
+
+
+        let gameRunning = false;
+        let animationFrameId;
+
+        // --- Game State ---
+        let player;
+        let enemies = [];
+        let projectiles = [];
+        let collectibles = [];
+        let keys = {};
+        let mouse = { x: canvas.width / 2, y: canvas.height / 2, leftDown: false, rightDown: false }; // Initialize mouse position
+
+        let score = 0; 
+        let nextLevelXP = 100;
+        let currentLevelGoal = 1; 
+
+        const GROUND_LEVEL = canvas.height - 50; 
+
+        // --- Player Object ---
+        function createPlayer() {
+            return {
+                x: canvas.width / 2 - 15,
+                y: GROUND_LEVEL - 30, // Initial position above ground
+                width: 30,
+                height: 30,
+                color: '#80a0ff', 
+                glowColor: 'rgba(100, 150, 255, 0.5)',
+                hp: 100,
+                maxHp: 100,
+                ep: 80,
+                maxEp: 80,
+                ammo: 20,
+                maxAmmo: 50,
+                // speed: 4, // Original speed, now for boost reference
+                followSpeedFactor: 0.15, // How quickly player follows mouse (0 to 1)
+                xp: 0,
+                level: 1,
+                baseAttack: 10,
+                attack: 10,
+                attackBoostTimer: 0,
+                attackBoostDuration: 5000, 
+                
+                immuneBoostActive: false,
+                immuneBoostCooldown: 15000, 
+                immuneBoostDuration: 3000, 
+                immuneBoostTimer: 0,
+                lastImmuneBoostTime: 0,
+
+                hitTimer: 0, 
+
+                draw() {
+                    ctx.fillStyle = this.color;
+                    if (this.hitTimer > 0) {
+                        ctx.fillStyle = 'rgba(255, 0, 0, 0.7)'; 
+                    }
+                    ctx.beginPath();
+                    ctx.arc(this.x + this.width / 2, this.y + this.height / 2, this.width / 2, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    let currentGlowRadius = this.width / 2;
+                    let currentGlowColor = 'transparent';
+
+                    if (this.immuneBoostActive) {
+                        currentGlowRadius += 5 + Math.sin(Date.now()/100)*2; // Pulsing glow
+                        currentGlowColor = 'rgba(255, 255, 100, 0.6)';
+                    } else if (this.attackBoostTimer > 0) {
+                        currentGlowRadius += 3 + Math.sin(Date.now()/150)*1.5;
+                        currentGlowColor = 'rgba(255, 100, 100, 0.5)';
+                    }
+
+                    if(currentGlowColor !== 'transparent'){
+                        ctx.beginPath();
+                        ctx.arc(this.x + this.width / 2, this.y + this.height / 2, currentGlowRadius, 0, Math.PI * 2);
+                        ctx.fillStyle = currentGlowColor;
+                        ctx.fill();
+                    }
+
+
+                    ctx.fillStyle = 'white';
+                    ctx.beginPath();
+                    ctx.arc(this.x + this.width * 0.3, this.y + this.height * 0.4, 3, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.beginPath();
+                    ctx.arc(this.x + this.width * 0.7, this.y + this.height * 0.4, 3, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.fillStyle = 'black';
+                    ctx.beginPath();
+                    ctx.arc(this.x + this.width * 0.3, this.y + this.height * 0.4, 1.5, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.beginPath();
+                    ctx.arc(this.x + this.width * 0.7, this.y + this.height * 0.4, 1.5, 0, Math.PI * 2);
+                    ctx.fill();
+                },
+                update() {
+                    // --- Mouse Follow Movement ---
+                    let targetX = mouse.x - this.width / 2;
+                    let targetY = mouse.y - this.height / 2;
+
+                    // Smooth movement
+                    let actualFollowSpeed = this.followSpeedFactor;
+                    if(this.immuneBoostActive) actualFollowSpeed *= 1.5; // Boosted follow speed
+
+                    this.x += (targetX - this.x) * actualFollowSpeed;
+                    this.y += (targetY - this.y) * actualFollowSpeed;
+
+                    // Screen boundaries
+                    if (this.x < 0) this.x = 0;
+                    if (this.x + this.width > canvas.width) this.x = canvas.width - this.width;
+                    if (this.y < 0) this.y = 0;
+                    if (this.y + this.height > GROUND_LEVEL) {
+                        this.y = GROUND_LEVEL - this.height;
+                    }
+                    // --- End Mouse Follow Movement ---
+
+
+                    if (this.ep < this.maxEp) {
+                        this.ep += 0.05; 
+                        if (this.ep > this.maxEp) this.ep = this.maxEp;
+                    }
+
+                    if (this.immuneBoostActive) {
+                        this.immuneBoostTimer -= 1000 / 60; 
+                        if (this.immuneBoostTimer <= 0) {
+                            this.immuneBoostActive = false;
+                            // this.speed /= 1.5; // No longer direct speed, follow factor handles this
+                            this.attack /= 1.5;
+                            this.lastImmuneBoostTime = Date.now();
+                            messageArea.textContent = "免疫爆發結束";
+                            setTimeout(() => { if(messageArea.textContent === "免疫爆發結束") messageArea.textContent = "";}, 2000);
+                        }
+                    }
+                    
+                    if (this.attackBoostTimer > 0) {
+                        this.attackBoostTimer -= 1000 / 60;
+                        if (this.attackBoostTimer <= 0) {
+                            this.attack = this.baseAttack * (this.immuneBoostActive ? 1.5 : 1); // Ensure boost stacks correctly
+                             messageArea.textContent = "攻擊強化結束";
+                            setTimeout(() => { if(messageArea.textContent === "攻擊強化結束") messageArea.textContent = "";}, 1500);
+                        }
+                    }
+
+                    if (this.hitTimer > 0) {
+                        this.hitTimer -= 1000 / 60;
+                    }
+                },
+                shoot(isRemote) {
+                    if (isRemote) {
+                        if (this.ammo > 0 && this.ep >= 5) {
+                            this.ammo--;
+                            this.ep -= 5;
+                            projectiles.push({
+                                x: this.x + this.width / 2 - 2.5,
+                                y: this.y + this.height / 2 - 2.5,
+                                width: 8, height: 8,
+                                color: '#60c0ff',
+                                speed: 10, // Slightly faster projectiles
+                                damage: this.attack * 0.7, 
+                                isPlayer: true,
+                                // Angle calculation is fine, as mouse.x/y is the target direction
+                                angle: Math.atan2(mouse.y - (this.y + this.height / 2), mouse.x - (this.x + this.width / 2))
+                            });
+                        }
+                    } else { 
+                        if (this.ep >= 2) {
+                            this.ep -= 2;
+                            projectiles.push({ 
+                                x: this.x + this.width / 2, 
+                                y: this.y + this.height / 2,
+                                width: this.width + 30, // Melee range
+                                height: this.height + 30,
+                                color: 'rgba(200, 220, 255, 0.4)',
+                                lifespan: 6, // slightly longer for visual
+                                damage: this.attack,
+                                isPlayer: true,
+                                isMelee: true,
+                                owner: this,
+                                // Melee attack direction still uses mouse for aiming the "cone"
+                                angle: Math.atan2(mouse.y - (this.y + this.height / 2), mouse.x - (this.x + this.width / 2))
+                            });
+                        }
+                    }
+                },
+                activateImmuneBoost() {
+                    if (this.ep >= 30 && Date.now() - this.lastImmuneBoostTime > this.immuneBoostCooldown) {
+                        this.ep -= 30;
+                        this.immuneBoostActive = true;
+                        this.immuneBoostTimer = this.immuneBoostDuration;
+                        // this.speed *= 1.5; // Replaced by followSpeedFactor modification during boost
+                        this.attack *= 1.5;
+                        messageArea.textContent = "免疫爆發！";
+                        setTimeout(() => { if(messageArea.textContent === "免疫爆發！") messageArea.textContent = "";}, 2000);
+                    } else if (this.ep < 30) {
+                        messageArea.textContent = "EP不足！";
+                        setTimeout(() => { if(messageArea.textContent === "EP不足！") messageArea.textContent = "";}, 1500);
+                    } else {
+                        messageArea.textContent = "免疫爆發冷卻中...";
+                        setTimeout(() => { if(messageArea.textContent === "免疫爆發冷卻中...") messageArea.textContent = "";}, 1500);
+                    }
+                },
+                takeDamage(amount) {
+                    this.hp -= amount;
+                    this.hitTimer = 300; 
+                    if (this.hp <= 0) {
+                        this.hp = 0;
+                        gameOver("細胞戰士陣亡！");
+                    }
+                },
+                gainXP(amount) {
+                    this.xp += amount;
+                    if (this.xp >= nextLevelXP) {
+                        this.levelUp();
+                    }
+                },
+                levelUp() {
+                    this.level++;
+                    this.xp = 0; 
+                    nextLevelXP = Math.floor(nextLevelXP * 1.5); 
+                    
+                    gameRunning = false; 
+                    levelUpScreen.style.display = 'flex';
+                    messageArea.textContent = `升到 ${this.level} 級！選擇進化！`;
+                }
+            };
+        }
+
+        // --- Enemy Object ---
+        function createEnemy(type = 'bacteria') {
+            let enemy = {
+                x: Math.random() < 0.5 ? -30 : canvas.width + 30, 
+                y: GROUND_LEVEL - 20 - Math.random() * (GROUND_LEVEL * 0.6), // Spawn enemies higher up too
+                width: 20,
+                height: 20,
+                speed: 1 + Math.random() * 1,
+                hp: 30,
+                maxHp: 30,
+                damage: 10,
+                xpValue: 10,
+                color: '#ff6060', 
+                type: type,
+                draw() {
+                    ctx.fillStyle = this.color;
+                    if (this.type === 'bacteria') { 
+                        ctx.fillRect(this.x, this.y, this.width, this.height);
+                    } else if (this.type === 'virus') { 
+                        ctx.beginPath();
+                        for (let i = 0; i < 6; i++) {
+                            ctx.lineTo(
+                                this.x + this.width / 2 + this.width / 2 * Math.cos(Math.PI / 3 * i),
+                                this.y + this.height / 2 + this.height / 2 * Math.sin(Math.PI / 3 * i)
+                            );
+                        }
+                        ctx.closePath();
+                        ctx.fill();
+                    }
+                    
+                    if (this.hp < this.maxHp) {
+                        ctx.fillStyle = 'grey';
+                        ctx.fillRect(this.x, this.y - 8, this.width, 4);
+                        ctx.fillStyle = 'red';
+                        ctx.fillRect(this.x, this.y - 8, this.width * (this.hp / this.maxHp), 4);
+                    }
+                },
+                update() {
+                    // Basic AI: move towards player (if player exists)
+                    if(player) {
+                        let dx = (player.x + player.width / 2) - (this.x + this.width / 2);
+                        let dy = (player.y + player.height / 2) - (this.y + this.height / 2);
+                        let dist = Math.sqrt(dx*dx + dy*dy);
+                        
+                        if (dist > 0) { // Avoid division by zero
+                            this.x += (dx / dist) * this.speed;
+                            this.y += (dy / dist) * this.speed;
+                        }
+
+                        // Prevent overlapping too much
+                        if (dist < this.width / 2 + player.width / 2) {
+                            this.x -= (dx / dist) * this.speed * 0.5;
+                            this.y -= (dy / dist) * this.speed * 0.5;
+                        }
+                    }
+                     // Keep enemies above ground
+                    if (this.y + this.height > GROUND_LEVEL) {
+                        this.y = GROUND_LEVEL - this.height;
+                    }
+                },
+                takeDamage(amount) {
+                    this.hp -= amount;
+                    if (this.hp <= 0) {
+                        if(player) player.gainXP(this.xpValue);
+                        score += this.xpValue; 
+                        if (Math.random() < 0.35) { // Slightly higher drop chance
+                            let type;
+                            const rand = Math.random();
+                            if (rand < 0.5) type = 'nutrient';
+                            else if (rand < 0.8) type = 'antibody';
+                            else type = 'cytokine';
+                            collectibles.push(createCollectible(this.x + this.width / 2, this.y + this.height / 2, type));
+                        }
+                        return true; 
+                    }
+                    return false; 
+                }
+            };
+            if (type === 'virus') {
+                enemy.color = '#a060ff'; 
+                enemy.width = 15;
+                enemy.height = 15;
+                enemy.speed = 2 + Math.random() * 1.5; // Viruses are faster
+                enemy.hp = 20;
+                enemy.maxHp = 20;
+                enemy.damage = 15;
+                enemy.xpValue = 15;
+            }
+            return enemy;
+        }
+
+        // --- Projectile Object ---
+        function updateProjectiles() {
+            for (let i = projectiles.length - 1; i >= 0; i--) {
+                let p = projectiles[i];
+                if (p.isMelee) {
+                    // Melee attack hitbox position updated with player, but its angle is fixed on creation
+                    p.x = p.owner.x + p.owner.width / 2; 
+                    p.y = p.owner.y + p.owner.height / 2;
+
+                    p.lifespan--;
+                    if (p.lifespan <= 0) {
+                        projectiles.splice(i, 1);
+                        continue;
+                    }
+                } else { 
+                    p.x += Math.cos(p.angle) * p.speed;
+                    p.y += Math.sin(p.angle) * p.speed;
+
+                    if (p.x < -p.width || p.x > canvas.width + p.width || p.y < -p.height || p.y > canvas.height + p.height) { // Give some buffer
+                        projectiles.splice(i, 1);
+                        continue;
+                    }
+                }
+            }
+        }
+
+        function drawProjectiles() {
+            projectiles.forEach(p => {
+                ctx.fillStyle = p.color;
+                if (p.isMelee) {
+                    ctx.globalAlpha = 0.4 + (p.lifespan / 12); // Fade out melee
+                    ctx.beginPath();
+                    ctx.moveTo(p.x, p.y); // Center of player
+                    // Arc based on projectile's stored angle (mouse direction at time of attack)
+                    ctx.arc(p.x, p.y, p.width/2, p.angle - Math.PI/5, p.angle + Math.PI/5); 
+                    ctx.closePath();
+                    ctx.fill();
+                    ctx.globalAlpha = 1.0;
+                } else {
+                    ctx.beginPath();
+                    ctx.arc(p.x + p.width / 2, p.y + p.height / 2, p.width / 2, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            });
+        }
+
+
+        // --- Collectible Object ---
+        function createCollectible(x, y, type) {
+            let collectible = {
+                x: x, y: y,
+                width: 15, height: 15,
+                type: type,
+                color: '#FFFFFF', 
+                effectValue: 0,
+                draw() {
+                    ctx.save(); // Save context for potential transformations
+                    ctx.translate(this.x, this.y); // Center drawing operations
+                    ctx.fillStyle = this.color;
+                    if (this.type === 'nutrient') { 
+                        ctx.beginPath();
+                        for (let i = 0; i < 5; i++) {
+                            ctx.lineTo((this.width/2) * Math.cos(Math.PI * 2 * i / 5 - Math.PI / 2), 
+                                       (this.height/2) * Math.sin(Math.PI * 2 * i / 5 - Math.PI / 2));
+                            ctx.lineTo((this.width/4) * Math.cos(Math.PI * 2 * (i + 0.5) / 5 - Math.PI / 2), 
+                                       (this.height/4) * Math.sin(Math.PI * 2 * (i + 0.5) / 5 - Math.PI / 2));
+                        }
+                        ctx.closePath();
+                        ctx.fill();
+                    } else if (this.type === 'antibody') { 
+                        ctx.beginPath();
+                        for (let i = 0; i < 6; i++) {
+                            ctx.lineTo(
+                                this.width / 2 * Math.cos(Math.PI / 3 * i),
+                                this.height / 2 * Math.sin(Math.PI / 3 * i)
+                            );
+                        }
+                        ctx.closePath();
+                        ctx.fill();
+                    } else if (this.type === 'cytokine') { 
+                        ctx.beginPath();
+                        ctx.arc(0, 0, this.width / 2, 0, Math.PI * 2);
+                        ctx.fill();
+                    }
+                    ctx.restore(); // Restore context
+                },
+                applyEffect() {
+                    let msg = "";
+                    if (this.type === 'nutrient') {
+                        player.ep = Math.min(player.maxEp, player.ep + 20);
+                        msg = "+20 EP";
+                    } else if (this.type === 'antibody') {
+                        player.ammo = Math.min(player.maxAmmo, player.ammo + 10);
+                        msg = "+10 彈藥";
+                    } else if (this.type === 'cytokine') {
+                        player.attackBoostTimer = player.attackBoostDuration;
+                        player.attack = player.baseAttack * 1.5 * (player.immuneBoostActive ? 1.5 : 1) ; // Stack with immune boost
+                        msg = "攻擊強化！";
+                    }
+                    messageArea.textContent = msg;
+                    setTimeout(() => {if(messageArea.textContent === msg) messageArea.textContent = "";}, 1500);
+                }
+            };
+            if (type === 'nutrient') { collectible.color = '#40ff40'; collectible.effectValue = 20; } 
+            else if (type === 'antibody') { collectible.color = '#60a0ff'; collectible.effectValue = 10; } 
+            else if (type === 'cytokine') { collectible.color = '#ff6060'; } 
+            return collectible;
+        }
+
+        function drawCollectibles() {
+            collectibles.forEach(c => c.draw());
+        }
+
+        // --- Collision Detection ---
+        function checkCollisions() {
+            if (!player) return; // Skip collisions if player doesn't exist
+
+            // Player projectiles vs Enemies
+            for (let i = projectiles.length - 1; i >= 0; i--) {
+                let p = projectiles[i];
+                if (!p.isPlayer) continue;
+
+                for (let j = enemies.length - 1; j >= 0; j--) {
+                    let e = enemies[j];
+                    let dist;
+                    if (p.isMelee) {
+                        // Check if enemy center is within the melee arc
+                        let dx = (e.x + e.width/2) - p.x; // p.x is player center for melee
+                        let dy = (e.y + e.height/2) - p.y; // p.y is player center for melee
+                        dist = Math.sqrt(dx*dx + dy*dy);
+                        if (dist < p.width/2 + e.width/2) { // Basic range check
+                            let angleToEnemy = Math.atan2(dy, dx);
+                            let angleDiff = Math.abs(p.angle - angleToEnemy);
+                            // Normalize angle difference
+                            if (angleDiff > Math.PI) angleDiff = 2 * Math.PI - angleDiff; 
+                            
+                            if (angleDiff <= Math.PI/5) { // Check if enemy is within the +/- PI/5 cone of attack
+                                if (e.takeDamage(p.damage)) {
+                                    enemies.splice(j, 1); 
+                                }
+                            }
+                        }
+                    } else { 
+                        dist = Math.sqrt(Math.pow((p.x + p.width/2) - (e.x + e.width/2), 2) + Math.pow((p.y + p.height/2) - (e.y + e.height/2), 2));
+                        if (dist < p.width/2 + e.width/2) { 
+                            if (e.takeDamage(p.damage)) {
+                                enemies.splice(j, 1); 
+                            }
+                            projectiles.splice(i, 1); 
+                            break; 
+                        }
+                    }
+                }
+            }
+            
+            // Enemies vs Player (rectangle collision for simplicity, could be circle)
+            enemies.forEach(e => {
+                let pCenterX = player.x + player.width / 2;
+                let pCenterY = player.y + player.height / 2;
+                let eCenterX = e.x + e.width / 2;
+                let eCenterY = e.y + e.height / 2;
+                let dist = Math.sqrt(Math.pow(pCenterX - eCenterX, 2) + Math.pow(pCenterY - eCenterY, 2));
+
+                if (dist < player.width / 2 + e.width / 2) {
+                    if (player.hitTimer <= 0) { 
+                        player.takeDamage(e.damage);
+                    }
+                }
+            });
+
+            // Player vs Collectibles
+            for (let i = collectibles.length - 1; i >= 0; i--) {
+                let c = collectibles[i];
+                let dist = Math.sqrt(Math.pow((player.x + player.width/2) - c.x, 2) + Math.pow((player.y + player.height/2) - c.y, 2));
+                if (dist < player.width/2 + c.width/2) {
+                    c.applyEffect();
+                    collectibles.splice(i, 1);
+                }
+            }
+        }
+
+        // --- Game Flow & UI ---
+        function updateUI() {
+            if(!player) return; // Don't update UI if player doesn't exist
+            hpBar.style.width = (player.hp / player.maxHp) * 100 + '%';
+            hpValue.textContent = `${Math.ceil(player.hp)}/${player.maxHp}`;
+            epBar.style.width = (player.ep / player.maxEp) * 100 + '%';
+            epValue.textContent = `${Math.ceil(player.ep)}/${player.maxEp}`;
+            ammoValue.textContent = `${player.ammo}/${player.maxAmmo}`;
+            xpBar.style.width = (player.xp / nextLevelXP) * 100 + '%';
+            xpValueText.textContent = `${player.xp}/${nextLevelXP}`;
+            levelValueText.textContent = player.level;
+        }
+
+        function spawnEnemies() {
+            if(!player) return;
+            if (enemies.length < 3 + player.level * 2) { 
+                if (Math.random() < (0.015 + player.level * 0.0025) ) { 
+                    const enemyType = Math.random() < (0.7 - player.level * 0.05) ? 'bacteria' : 'virus'; // More viruses at higher levels
+                    enemies.push(createEnemy(enemyType));
+                }
+            }
+        }
+
+        function drawEnvironment() {
+            ctx.fillStyle = '#4a2a2a'; 
+            ctx.fillRect(0, GROUND_LEVEL, canvas.width, canvas.height - GROUND_LEVEL);
+
+            let pulse = Math.sin(Date.now() / 1000) * 0.1 + 0.9; 
+            let grad = ctx.createRadialGradient(canvas.width/2, canvas.height/2, 0, canvas.width/2, canvas.height/2, canvas.width * pulse );
+            grad.addColorStop(0, "rgba(60, 0, 0, 0.1)");
+            grad.addColorStop(0.5, "rgba(80, 20, 20, 0.2)");
+            grad.addColorStop(1, "rgba(30, 0, 0, 0.3)");
+            ctx.fillStyle = grad;
+            ctx.fillRect(0, 0, canvas.width, GROUND_LEVEL); 
+
+
+            for(let i=0; i<10; i++) { 
+                ctx.beginPath();
+                let speedFactor = (30 + i * 8); // Slower background elements
+                let xPos = ( (Date.now() / speedFactor) + i*90 + Math.sin(Date.now() / (2200 + i*60)) * 60 ) % (canvas.width + 120) - 60;
+                let yPos = (GROUND_LEVEL - 20) / 9 * i + Math.sin(Date.now()/(900+i*130) + i )*35;
+                let radius = 3 + i * 1.2 + Math.sin(Date.now() / (700 + i*110)) * 1.5;
+                ctx.arc( xPos , yPos, radius, 0, Math.PI*2);
+                ctx.fillStyle = `rgba(200, ${30+i*10}, ${30+i*10}, 0.03 + i*0.003)`; 
+                ctx.fill();
+            }
+        }
+
+
+        function gameLoop() {
+            if (!gameRunning) {
+                if (levelUpScreen.style.display === 'none') { 
+                    animationFrameId = requestAnimationFrame(gameLoop);
+                }
+                return;
+            }
+
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            drawEnvironment();
+
+            if(player) { // Only update and draw if player exists
+                player.update();
+                player.draw();
+            }
+
+            enemies.forEach(e => e.update());
+            enemies.forEach(e => e.draw());
+
+            updateProjectiles();
+            drawProjectiles();
+
+            drawCollectibles(); 
+
+            checkCollisions();
+            spawnEnemies();
+            updateUI();
+
+            if (player && player.level >= 3) { 
+                 let bossSpawned = enemies.find(e => e.type === 'boss_bacteria'); 
+                 if (!bossSpawned && !window.bossDefeated) { 
+                    enemies.push(createBossEnemy());
+                 }
+                 if (window.bossDefeated) {
+                    gameOver("超級細菌魔王已被消滅！恭喜你成為免疫細胞王，宿主恢復健康！", true);
+                    return;
+                 }
+            }
+            
+            animationFrameId = requestAnimationFrame(gameLoop);
+        }
+        
+        function createBossEnemy() {
+            let boss = createEnemy('bacteria'); 
+            boss.type = 'boss_bacteria';
+            boss.x = canvas.width / 2 - 50;
+            boss.y = GROUND_LEVEL - 120; // Spawn slightly higher
+            boss.width = 100;
+            boss.height = 100;
+            boss.color = '#8B0000'; 
+            boss.hp = 300 + (player ? player.level * 150 : 150); 
+            boss.maxHp = boss.hp;
+            boss.damage = 30; // Boss hits harder
+            boss.xpValue = 500;
+            boss.speed = 0.3; // Boss is slower but tankier
+            let originalDraw = boss.draw;
+            boss.draw = function() { 
+                originalDraw.call(this); 
+                ctx.fillStyle = 'yellow'; 
+                ctx.beginPath(); // Crown points
+                ctx.moveTo(this.x + this.width/2 - 15, this.y - 5);
+                ctx.lineTo(this.x + this.width/2 - 5, this.y - 20);
+                ctx.lineTo(this.x + this.width/2 + 5, this.y - 5);
+                ctx.fill();
+                ctx.moveTo(this.x + this.width/2 + 5, this.y - 5);
+                ctx.lineTo(this.x + this.width/2 + 15, this.y - 20);
+                ctx.lineTo(this.x + this.width/2 + 25, this.y - 5);
+                ctx.fill();
+                ctx.fillRect(this.x + this.width/2 - 20, this.y - 10, 40, 10);
+            }
+            let originalTakeDamage = boss.takeDamage;
+            boss.takeDamage = function(amount) {
+                let died = originalTakeDamage.call(this, amount);
+                if (died) {
+                    window.bossDefeated = true; 
+                }
+                return died;
+            }
+            messageArea.textContent = "超級細菌魔王出現！";
+            setTimeout(() => {if(messageArea.textContent === "超級細菌魔王出現！") messageArea.textContent = "";}, 3000);
+            return boss;
+        }
+
+
+        function gameOver(message, isWin = false) {
+            gameRunning = false;
+            cancelAnimationFrame(animationFrameId);
+            gameOverScreen.style.display = 'flex';
+            document.getElementById('game-over-message').textContent = message;
+            if (isWin) {
+                gameOverScreen.querySelector('h1').textContent = "勝利！";
+            } else {
+                gameOverScreen.querySelector('h1').textContent = "遊戲結束";
+            }
+        }
+
+        function resetGame() {
+            player = createPlayer();
+            enemies = [];
+            projectiles = [];
+            collectibles = [];
+            keys = {}; // Keep keys for 'E' skill
+            mouse.leftDown = false; // Reset mouse state
+            mouse.rightDown = false;
+            score = 0;
+            currentLevelGoal = 1;
+            nextLevelXP = 100;
+            gameRunning = true;
+            window.bossDefeated = false; 
+            
+            startScreen.style.display = 'none';
+            gameOverScreen.style.display = 'none';
+            levelUpScreen.style.display = 'none';
+            messageArea.textContent = '遊戲開始！保護宿主！';
+            setTimeout(() => {if(messageArea.textContent === '遊戲開始！保護宿主！') messageArea.textContent = '';}, 2000);
+            
+            enemies.push(createEnemy());
+
+            if (animationFrameId) cancelAnimationFrame(animationFrameId);
+            gameLoop();
+        }
+
+        // --- Event Listeners ---
+        window.addEventListener('keydown', (e) => {
+            keys[e.key.toLowerCase()] = true;
+            if (e.key.toLowerCase() === 'e' && gameRunning && player) { 
+                player.activateImmuneBoost();
+            }
+        });
+        window.addEventListener('keyup', (e) => {
+            keys[e.key.toLowerCase()] = false;
+        });
+
+        canvas.addEventListener('mousemove', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            mouse.x = e.clientX - rect.left;
+            mouse.y = e.clientY - rect.top;
+        });
+
+        canvas.addEventListener('mousedown', (e) => {
+            if (!gameRunning || !player) return; 
+            if (e.button === 0) { 
+                mouse.leftDown = true;
+                player.shoot(false); 
+            } else if (e.button === 2) { 
+                e.preventDefault(); 
+                mouse.rightDown = true;
+                player.shoot(true); 
+            }
+        });
+        canvas.addEventListener('mouseup', (e) => {
+            if (e.button === 0) mouse.leftDown = false;
+            else if (e.button === 2) mouse.rightDown = false;
+        });
+        canvas.addEventListener('contextmenu', e => e.preventDefault());
+
+
+        startButton.addEventListener('click', () => {
+            resetGame();
+        });
+
+        restartButton.addEventListener('click', () => {
+            resetGame();
+        });
+
+        evolutionButtons.forEach(button => {
+            button.addEventListener('click', (e) => {
+                if(!player) return;
+                const choice = e.target.dataset.choice;
+                let evolutionMsg = "";
+                switch(choice) {
+                    case 'attack':
+                        player.baseAttack += 5;
+                        player.attack = player.baseAttack * (player.attackBoostTimer > 0 || player.immuneBoostActive ? 1.5 : 1);
+                        evolutionMsg = "攻擊力提升！";
+                        break;
+                    case 'defense':
+                        player.maxHp += 20;
+                        player.hp = player.maxHp; 
+                        evolutionMsg = "HP上限提升！";
+                        break;
+                    case 'speedFactor': // Changed from 'speed'
+                        player.followSpeedFactor = Math.min(player.followSpeedFactor + 0.03, 0.5); // Cap follow speed
+                        evolutionMsg = "滑鼠跟隨速度提升！";
+                        break;
+                    case 'epregen':
+                        player.maxEp += 20;
+                        player.ep = player.maxEp;
+                        evolutionMsg = "EP上限及恢復提升！";
+                        break;
+                }
+                levelUpScreen.style.display = 'none';
+                gameRunning = true; 
+                messageArea.textContent = evolutionMsg;
+                setTimeout(() => {if(messageArea.textContent === evolutionMsg) messageArea.textContent = "";}, 2000);
+                animationFrameId = requestAnimationFrame(gameLoop); 
+            });
+        });
+
+        function initializeUI() {
+            player = createPlayer(); 
+            mouse.x = player.x + player.width / 2; // Initialize mouse to player start
+            mouse.y = player.y + player.height / 2;
+            updateUI();
+            startScreen.style.display = 'flex';
+            messageArea.textContent = "準備好了嗎？細胞戰士！";
+        }
+
+        initializeUI(); 
+    </script>
+</body>
+</html>
